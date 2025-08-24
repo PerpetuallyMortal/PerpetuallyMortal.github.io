@@ -341,11 +341,12 @@
       const code = offerIn.value.trim(); if(!code) return;
       stateRecv.textContent='parsing…';
       const pc = new RTCPeerConnection({
-        iceServers:[
-          { urls:'stun:stun.l.google.com:19302' },
-          { urls:'stun:global.stun.twilio.com:3478?transport=udp' }
-        ]
-      });
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:global.stun.twilio.com:3478' }
+  ]
+});
+
       recv.pc = pc;
       pc.onconnectionstatechange = ()=> stateRecv.textContent = pc.connectionState;
       pc.ondatachannel = (ev)=>{
