@@ -238,11 +238,11 @@
       offerOut.value=''; copyOfferBtn.disabled=true; acceptAnswerBtn.disabled=true;
       stateSend.textContent='preparing…';
       const pc = new RTCPeerConnection({
-        iceServers:[
-          { urls:'stun:stun.l.google.com:19302' },
-          { urls:'stun:global.stun.twilio.com:3478?transport=udp' }
-        ]
-      });
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:global.stun.twilio.com:3478' }
+  ]
+});
       send.pc = pc;
       const dc = pc.createDataChannel('peerbeam');
       send.dc = dc;
