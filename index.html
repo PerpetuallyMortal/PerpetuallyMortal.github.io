@@ -7,12 +7,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
-  <meta name="description" content="Direct browser‑to‑browser file & folder transfer using WebRTC DataChannels with manual code pairing. No trackers. No servers." />
+  <meta name="description" content="Direct browser‑to‑browser file & folder transfer using WebRTC DataChannels with manual code pairing. No trackers. No servers. Persistent session — send multiple times without new codes." />
   <style>
-    :root{
-      --bg:#080b11; --panel:#0f1420; --ink:#eaf2ff; --muted:#9db0c9; --brand:#7c5cff; --brand2:#21d4fd; --ok:#36d399; --warn:#fbbf24; --err:#f87171;
-      --radius:18px; --shadow:0 10px 30px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.3);
-    }
+    :root{ --bg:#080b11; --panel:#0f1420; --ink:#eaf2ff; --muted:#9db0c9; --brand:#7c5cff; --brand2:#21d4fd; --ok:#36d399; --warn:#fbbf24; --err:#f87171; --radius:18px; --shadow:0 10px 30px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.3); }
     *{box-sizing:border-box}
     html,body{height:100%}
     body{margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Helvetica Neue",Arial,sans-serif; color:var(--ink);
@@ -44,7 +41,7 @@
     .btn:disabled{opacity:.5; cursor:not-allowed}
     .btn-ghost{background:transparent}
     .field{background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); border-radius:12px; padding:10px 12px; width:100%; color:var(--ink); font-weight:600}
-    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:14px}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size:14px}
     .dropzone{border:2px dashed rgba(255,255,255,.15); border-radius:16px; padding:24px; text-align:center; transition:.25s ease; min-height:140px; display:grid; place-items:center}
     .dropzone.drag{background:rgba(124,92,255,.08); border-color:var(--brand)}
     .list{display:flex; flex-direction:column; gap:10px; max-height:380px; overflow:auto; padding-right:6px}
@@ -66,15 +63,15 @@
         </div>
         <div>
           <div class="title">PeerBeam</div>
-          <div class="tag tiny">Direct P2P over WebRTC — manual pairing, no trackers, no server</div>
+          <div class="tag tiny">Direct P2P over WebRTC — manual pairing, no trackers, no server. Session stays alive.</div>
         </div>
       </div>
-      <div class="pill tiny">Works on HTTPS sites like GitHub Pages. Sender & receiver must exchange codes.</div>
+      <div class="pill tiny">Once paired, keep both tabs open and send repeatedly — no new codes.</div>
     </header>
 
     <section class="hero card">
       <h1>Share files & folders with nothing in the middle.</h1>
-      <p class="muted">Drop files or an entire folder. Create a one‑time pairing code, paste it on the other device, paste their answer back, and the tunnel opens. It’s just your browser and theirs — no cloud, no trackers.</p>
+      <p class="muted">Create a one‑time pairing code, paste it on the other device, paste their answer back. Connection stays alive — drop files anytime to send again.</p>
 
       <div class="tabs" role="tablist" aria-label="Modes">
         <button class="tab" id="tab-send" role="tab" aria-selected="true" aria-controls="panel-send">Send</button>
@@ -95,13 +92,14 @@
                 <input id="pick" type="file" hidden multiple>
                 <input id="pick-dir" type="file" hidden webkitdirectory directory multiple>
               </div>
+              <div class="tiny muted" style="margin-top:8px">You can pick now or after pairing — either way works.</div>
             </div>
           </div>
 
           <div style="margin-top:16px">
             <div class="muted tiny" style="margin-bottom:6px">Step 1 — Create pairing code (offer)</div>
             <div class="row">
-              <button id="make-offer" class="btn" disabled>Create code</button>
+              <button id="make-offer" class="btn">Create code</button>
               <button id="copy-offer" class="btn btn-ghost" disabled>Copy</button>
             </div>
             <textarea id="offer" class="field mono" rows="6" placeholder="Offer code will appear here" readonly></textarea>
@@ -117,10 +115,10 @@
           </div>
 
           <div id="seed-ui" style="display:none; margin-top:16px">
-            <div class="muted tiny" style="margin-bottom:6px">Transfer</div>
+            <div class="muted tiny" style="margin-bottom:6px">Transfer (connection persists — drop more files anytime)</div>
             <div class="progress"><div id="seed-bar" class="bar"></div></div>
             <div class="row tiny muted" style="margin-top:8px; gap:8px">
-              <span class="pill">Files: <span id="seed-files">0</span></span>
+              <span class="pill">In queue: <span id="seed-files">0</span></span>
               <span class="pill">Sent: <span id="seed-sent">0 B</span></span>
               <span class="pill">Rate: <span id="seed-rate">0 KB/s</span></span>
             </div>
@@ -158,13 +156,12 @@
       <div class="tiny muted" style="margin-top:12px">Heads-up: With only STUN (no TURN), some strict NATs may fail to connect. Try switching one device to mobile hotspot if it stalls at "connecting".</div>
     </section>
 
-    <footer style="margin:26px 0 10px; text-align:center" class="muted tiny">This is true end-to-end. There’s no server. The codes are just your WebRTC session descriptions, base64‑packed for convenience.</footer>
+    <footer style="margin:26px 0 10px; text-align:center" class="muted tiny">This is true end-to-end. There’s no server. The codes are just your WebRTC session descriptions, base64‑packed for convenience. Session persists until a tab reloads or closes.</footer>
   </div>
 
   <script>
     // ——— helpers
     const $ = s => document.querySelector(s);
-    const sleep = ms => new Promise(r=>setTimeout(r,ms));
     const fmtBytes = (b)=>{ if(b===0) return '0 B'; const u=['B','KB','MB','GB','TB']; const i=Math.floor(Math.log(b)/Math.log(1024)); return (b/Math.pow(1024,i)).toFixed(i?1:0)+' '+u[i]; };
     const fmtSpeed = (bps)=> `${fmtBytes(bps)}/s`;
 
@@ -174,20 +171,19 @@
     function selectTab(which){ const isSend=which==='send'; tabSend.setAttribute('aria-selected',isSend); tabRecv.setAttribute('aria-selected',!isSend); panelSend.hidden=!isSend; panelRecv.hidden=isSend; (isSend?panelSend:panelRecv).scrollIntoView({behavior:'smooth'}); }
     tabSend.addEventListener('click',()=>selectTab('send')); tabRecv.addEventListener('click',()=>selectTab('recv'));
 
-    // ——— ICE utils (disable trickle: wait for complete, so codes are one paste)
+    // ——— ICE utils (single-paste codes)
     function waitIceComplete(pc){
       return new Promise(resolve=>{
         if (pc.iceGatheringState === 'complete') return resolve();
         function check(){ if (pc.iceGatheringState === 'complete'){ pc.removeEventListener('icegatheringstatechange', check); resolve(); } }
         pc.addEventListener('icegatheringstatechange', check);
-        // Also guard: if ICE servers are slow, force resolve after 8s
         setTimeout(()=>resolve(), 8000);
       });
     }
 
-    // ——— global state (one session at a time)
-    let send = { pc:null, dc:null, files:[], bytes:0, startTs:0 };
-    let recv = { pc:null, dc:null, files:[], bytes:0, startTs:0 };
+    // ——— global state (persistent session)
+    let send = { pc:null, dc:null, queue:[], sending:false, bytes:0, totalBytes:0, startTs:0 };
+    let recv = { pc:null, dc:null, bytes:0, startTs:0 };
 
     // ——— file picking (sender)
     const drop=$('#drop'), pick=$('#pick'), pickDir=$('#pick-dir');
@@ -206,9 +202,9 @@
       if (items && items.length && items[0].webkitGetAsEntry){
         const promises = [];
         for (const item of items){ const entry=item.webkitGetAsEntry(); if(entry) promises.push(readEntry(entry)); }
-        Promise.all(promises).then(arr=>handleFiles(arr.flat()));
+        Promise.all(promises).then(arr=>queueFiles(arr.flat()));
       } else {
-        handleFiles([...e.dataTransfer.files]);
+        queueFiles([...e.dataTransfer.files]);
       }
     }
     function readEntry(entry){
@@ -219,30 +215,37 @@
       });
     }
 
-    pick.addEventListener('change', e=> handleFiles([...e.target.files]));
-    pickDir.addEventListener('change', e=> handleFiles([...e.target.files]));
+    pick.addEventListener('change', e=> queueFiles([...e.target.files]));
+    pickDir.addEventListener('change', e=> queueFiles([...e.target.files]));
 
-    function handleFiles(files){
+    function queueFiles(files){
       if(!files || !files.length) return;
-      send.files = files.map(f=>{ return { file:f, name:f.name, size:f.size, path:f.webkitRelativePath||f.relativePath||f.name }; });
-      makeOfferBtn.disabled = false;
-      seedUI.style.display = 'none';
-      seedList.innerHTML='';
-      seedFiles.textContent = String(send.files.length);
-      send.bytes=0;
-      send.startTs=0;
+      const additions = files.map(f=>({ file:f, name:f.name, size:f.size, path:f.webkitRelativePath||f.relativePath||f.name }));
+      send.queue.push(...additions);
+      seedFiles.textContent = String(send.queue.length);
+      // Show list items pending
+      additions.forEach((m, idx)=>{
+        const row=document.createElement('div'); row.className='file'; row.id=`s-row-${Date.now()}-${idx}`;
+        row.innerHTML=`<div class="row" style="gap:8px"><strong>${m.path}</strong><span class="tiny muted">${fmtBytes(m.size)}</span></div><div class="tiny muted">queued</div>`;
+        seedList.appendChild(row);
+      });
+      if (send.dc && send.dc.readyState==='open' && !send.sending){
+        startSendingLoop();
+      } else {
+        // will auto-start once DC opens
+      }
     }
 
-    // ——— Sender: create offer code
+    // ——— Sender: create offer code (can be done before files are chosen)
     makeOfferBtn.addEventListener('click', async ()=>{
       offerOut.value=''; copyOfferBtn.disabled=true; acceptAnswerBtn.disabled=true;
       stateSend.textContent='preparing…';
       const pc = new RTCPeerConnection({
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:global.stun.twilio.com:3478' }
-  ]
-});
+        iceServers:[
+          { urls:'stun:stun.l.google.com:19302' },
+          { urls:'stun:global.stun.twilio.com:3478' }
+        ]
+      });
       send.pc = pc;
       const dc = pc.createDataChannel('peerbeam');
       send.dc = dc;
@@ -263,71 +266,87 @@
     acceptAnswerBtn.addEventListener('click', async ()=>{
       const code = answerIn.value.trim(); if(!code || !send.pc) return;
       stateSend.textContent='connecting…';
-      try{
-        const sdp = JSON.parse(decodeURIComponent(escape(atob(code))));
-        await send.pc.setRemoteDescription(sdp);
-      }catch(e){ stateSend.textContent='bad-answer'; console.error(e); return; }
+      try{ const sdp = JSON.parse(decodeURIComponent(escape(atob(code)))); await send.pc.setRemoteDescription(sdp); }
+      catch(e){ stateSend.textContent='bad-answer'; console.error(e); return; }
     });
 
     function wireDataChannelSender(dc){
       dc.binaryType='arraybuffer';
       dc.bufferedAmountLowThreshold = 1<<20; // 1 MB
-      dc.onopen = async ()=>{
-        // send manifest
-        const manifest = send.files.map((f,i)=>({i, name:f.name, size:f.size, path:f.path}));
-        dc.send(JSON.stringify({t:'manifest', files:manifest}));
+      dc.onopen = ()=>{
         seedUI.style.display='block';
-        send.startTs = performance.now();
-        // list UI
-        seedList.innerHTML='';
-        manifest.forEach(m=>{
-          const row=document.createElement('div'); row.className='file';
-          row.innerHTML=`<div class="row" style="gap:8px"><strong>${m.path}</strong><span class="tiny muted">${fmtBytes(m.size)}</span></div><div class="tiny muted" id="s-${m.i}">0%</div>`;
-          seedList.appendChild(row);
-        });
-        // send files sequentially
-        for (const meta of manifest){
-          dc.send(JSON.stringify({t:'fileStart', i:meta.i, name:meta.name, size:meta.size, path:meta.path}));
-          await sendFileChunks(dc, send.files[meta.i].file, (sent,total)=>{
-            const p = total? Math.min(100, (sent/total)*100):0;
-            const stat = document.getElementById(`s-${meta.i}`); if(stat) stat.textContent = p.toFixed(0)+'%';
-            send.bytes = (send.bytes || 0) + 0; // keep var alive
-            const elapsed = Math.max(1, (performance.now()-send.startTs)/1000);
-            const rate = (dc.bufferedAmount?0:0); // we'll compute below
-          });
-          dc.send(JSON.stringify({t:'fileEnd', i:meta.i}));
-        }
-        dc.send(JSON.stringify({t:'allDone'}));
+        send.bytes=0; send.totalBytes=0; send.startTs=performance.now();
+        // If there are pending files, start sending
+        if (send.queue.length && !send.sending) startSendingLoop();
       };
+      dc.onclose = ()=>{ /* session ended */ };
+
+      // speed/progress ticker
       let lastBytes=0, lastTs=performance.now();
       const tick=()=>{
-        const now=performance.now();
-        const dt=(now-lastTs)/1000; if(dt>=1){
+        const now=performance.now(); const dt=(now-lastTs)/1000; if(dt>=1){
           const sent = send.bytes; const dBytes = sent-lastBytes; lastBytes=sent; lastTs=now;
           seedRate.textContent = fmtSpeed(dBytes/dt);
-          const total = send.files.reduce((a,f)=>a+f.size,0);
-          const prog = total? (sent/total)*100:0; seedBar.style.width = prog.toFixed(1)+'%';
+          const totalQueued = send.totalBytes || send.queue.reduce((a,f)=>a+f.size,0);
+          const prog = totalQueued? (sent/totalQueued)*100: (send.sending? (sent?100:0):0);
+          seedBar.style.width = Math.min(100, prog).toFixed(1)+'%';
           seedSent.textContent = fmtBytes(sent);
         }
         requestAnimationFrame(tick);
       }; tick();
     }
 
+    async function startSendingLoop(){
+      if (!send.dc || send.dc.readyState!=='open') return;
+      send.sending = true;
+      // snapshot total for this batch
+      send.totalBytes = send.queue.reduce((a,f)=>a+f.size,0);
+
+      // Build manifest for current queue
+      const manifest = send.queue.map((f,i)=>({i, name:f.name, size:f.size, path:f.path}));
+      send.dc.send(JSON.stringify({t:'manifest', files:manifest}));
+
+      // render list entries to show 0%
+      seedList.querySelectorAll('.file').forEach((row,idx)=>{
+        // append progress cell if not present
+        if (!row.querySelector('.tiny.muted:last-child')){
+          const prog = document.createElement('div'); prog.className='tiny muted'; prog.id=`s-${idx}`; prog.textContent='0%'; row.appendChild(prog);
+        }
+      });
+
+      // send files sequentially
+      for (let i=0;i<send.queue.length;i++){
+        const meta = manifest[i];
+        const item = send.queue[i];
+        send.dc.send(JSON.stringify({t:'fileStart', i:meta.i, name:meta.name, size:meta.size, path:meta.path}));
+        await sendFileChunks(send.dc, item.file, (sent,total)=>{
+          const p = total? Math.min(100, (sent/total)*100):0;
+          const stat = document.getElementById(`s-${meta.i}`); if(stat) stat.textContent = p.toFixed(0)+'%';
+        });
+        send.dc.send(JSON.stringify({t:'fileEnd', i:meta.i}));
+      }
+      send.dc.send(JSON.stringify({t:'allDone'}));
+      // clear queue after sending
+      send.queue = [];
+      seedFiles.textContent = '0';
+      send.sending = false;
+      // leave connection open; user can drop more files and we'll start again
+    }
+
     async function sendFileChunks(dc, file, onProg){
       const CHUNK = 64 * 1024; // 64KB
-      let offset = 0; const reader = file.stream().getReader();
+      const reader = file.stream().getReader();
+      let sent = 0;
       while(true){
         const {done, value} = await reader.read();
         if(done) break;
         let chunk = value.buffer;
-        // flow control
         if (dc.bufferedAmount > dc.bufferedAmountLowThreshold){
           await new Promise(res=>{ const h=()=>{ if(dc.bufferedAmount <= dc.bufferedAmountLowThreshold){ dc.removeEventListener('bufferedamountlow', h); res(); } }; dc.addEventListener('bufferedamountlow', h); });
         }
         dc.send(chunk);
-        offset += value.byteLength;
-        send.bytes += value.byteLength;
-        onProg(offset, file.size);
+        sent += value.byteLength; send.bytes += value.byteLength;
+        onProg(sent, file.size);
       }
     }
 
@@ -341,17 +360,14 @@
       const code = offerIn.value.trim(); if(!code) return;
       stateRecv.textContent='parsing…';
       const pc = new RTCPeerConnection({
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:global.stun.twilio.com:3478' }
-  ]
-});
-
+        iceServers:[
+          { urls:'stun:stun.l.google.com:19302' },
+          { urls:'stun:global.stun.twilio.com:3478' }
+        ]
+      });
       recv.pc = pc;
       pc.onconnectionstatechange = ()=> stateRecv.textContent = pc.connectionState;
-      pc.ondatachannel = (ev)=>{
-        const dc = ev.channel; recv.dc = dc; wireDataChannelReceiver(dc);
-      };
+      pc.ondatachannel = (ev)=>{ const dc = ev.channel; recv.dc = dc; wireDataChannelReceiver(dc); };
       let remote;
       try{ remote = JSON.parse(decodeURIComponent(escape(atob(code)))); }
       catch(e){ stateRecv.textContent='bad-offer'; console.error(e); return; }
@@ -369,56 +385,485 @@
       dc.binaryType='arraybuffer';
       const files=[]; // {i,name,size,path,parts:[],received}
       recv.bytes=0; recv.startTs=performance.now();
-      list.innerHTML=''; dlFiles.textContent='0';
+      // do not clear list on each new batch; keep history
 
       dc.onmessage = (ev)=>{
         if (typeof ev.data === 'string'){
           try{
             const msg = JSON.parse(ev.data);
             if (msg.t==='manifest'){
-              // populate list
               msg.files.forEach(m=>{
-                const row=document.createElement('div'); row.className='file'; row.id=`r-${m.i}`;
+                const row=document.createElement('div'); row.className='file'; row.id=`r-${Date.now()}-${m.i}`;
                 row.innerHTML=`<div class="row" style="gap:8px"><strong>${m.path}</strong><span class=\"tiny muted\">${fmtBytes(m.size)}</span></div><div class="tiny muted" id="p-${m.i}">0%</div>`;
                 list.appendChild(row);
                 files[m.i] = {i:m.i,name:m.name,size:m.size,path:m.path,parts:[],received:0};
               });
-              dlFiles.textContent = String(msg.files.length);
+              dlFiles.textContent = String((+dlFiles.textContent||0) + msg.files.length);
             } else if (msg.t==='fileStart'){
-              // ensure file object exists
               files[msg.i] = files[msg.i] || {i:msg.i,name:msg.name,size:msg.size,path:msg.path,parts:[],received:0};
             } else if (msg.t==='fileEnd'){
               const f = files[msg.i];
               const blob = new Blob(f.parts, {type:'application/octet-stream'});
               const url = URL.createObjectURL(blob);
-              const row = document.getElementById(`r-${msg.i}`);
-              const dl = document.createElement('a'); dl.className='btn'; dl.textContent='Save'; dl.href=url; dl.download=f.path||f.name; row.appendChild(dl);
-            } else if (msg.t==='allDone'){
-              // nothing
+              const row = document.getElementById(`p-${msg.i}`)?.parentElement;
+              const dl = document.createElement('a'); dl.className='btn'; dl.textContent='Save'; dl.href=url; dl.download=f.path||f.name; if(row) row.appendChild(dl);
             }
-          }catch{ /* non-JSON text? ignore */ }
+          }catch{ /* ignore non-JSON text */ }
         } else {
-          // binary chunk -> assign to the last file that is being filled
-          // Find the earliest file that is not complete
+          // binary chunk -> map to first incomplete file
           const f = files.find(x=>x && x.received < x.size);
-          if(!f){ return; }
+          if(!f) return;
           const buf = ev.data; f.parts.push(buf); f.received += buf.byteLength; recv.bytes += buf.byteLength;
           const p = f.size? Math.min(100, (f.received/f.size)*100):0;
           const el = document.getElementById(`p-${f.i}`); if(el) el.textContent=p.toFixed(0)+'%';
         }
       };
 
+      // speed ticker
       let lastBytes=0, lastTs=performance.now();
       const tick=()=>{
         const now=performance.now(); const dt=(now-lastTs)/1000; if(dt>=1){
           const got = recv.bytes; const dBytes = got-lastBytes; lastBytes=got; lastTs=now;
           dlRate.textContent = fmtSpeed(dBytes/dt);
           dlRecv.textContent = fmtBytes(got);
-          // overall progress approximated by bytes over total known
-          const total = Array.from(list.children).reduce((a,row)=>{
-            const meta = />([^<]+)<\/strong><span class=\\"tiny muted\\">([^<]+)<\/span>/.exec(row.innerHTML);
-            return a; // keep simple, we update visually per-file
-          },0);
+        }
+        requestAnimationFrame(tick);
+      }; tick();
+    }
+
+    // keyboard shortcuts
+    document.addEventListener('keydown', e=>{ if(e.ctrlKey && e.key==='1') selectTab('send'); if(e.ctrlKey && e.key==='2') selectTab('recv'); });
+  </script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PeerBeam — Direct P2P (No Trackers, No Server)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <meta name="description" content="Direct browser‑to‑browser file & folder transfer using WebRTC DataChannels with manual code pairing. No trackers. No servers. Persistent session — send multiple times without new codes." />
+  <style>
+    :root{ --bg:#080b11; --panel:#0f1420; --ink:#eaf2ff; --muted:#9db0c9; --brand:#7c5cff; --brand2:#21d4fd; --ok:#36d399; --warn:#fbbf24; --err:#f87171; --radius:18px; --shadow:0 10px 30px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.3); }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Helvetica Neue",Arial,sans-serif; color:var(--ink);
+      background: radial-gradient(1200px 700px at 10% -10%, rgba(124,92,255,.18), transparent 60%),
+                  radial-gradient(800px 600px at 110% 10%, rgba(33,212,253,.15), transparent 60%), var(--bg);
+    }
+    .wrap{max-width:1100px; margin:0 auto; padding:28px}
+    header{display:flex; align-items:center; justify-content:space-between; gap:16px}
+    .logo{display:flex; align-items:center; gap:12px}
+    .logo-badge{width:46px; height:46px; border-radius:14px; background:linear-gradient(135deg,var(--brand),var(--brand2)); display:grid; place-items:center; box-shadow:var(--shadow)}
+    .logo svg{filter:drop-shadow(0 4px 12px rgba(0,0,0,.35))}
+    .title{font-weight:800; letter-spacing:.2px}
+    .tag{color:var(--muted)}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.00)); border:1px solid rgba(255,255,255,.08); border-radius:var(--radius); box-shadow:var(--shadow)}
+    .hero{margin-top:18px; padding:24px}
+    h1{margin:8px 0 6px; font-size:clamp(28px,4vw,40px)}
+    p{margin:0}
+    .tabs{margin-top:18px; display:flex; gap:10px; flex-wrap:wrap}
+    .tab{cursor:pointer; padding:12px 16px; border-radius:14px; font-weight:800; border:1px solid rgba(255,255,255,.1); background:rgba(124,92,255,.08)}
+    .tab[aria-selected="false"]{background:transparent; color:var(--muted)}
+
+    .grid{display:grid; grid-template-columns:1fr; gap:18px; margin-top:18px}
+    @media(min-width:980px){ .grid{grid-template-columns: 1.1fr .9fr} }
+
+    .pane{padding:18px}
+    .muted{color:var(--muted)}
+    .row{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+    .btn{appearance:none; border:0; cursor:pointer; padding:12px 16px; border-radius:14px; font-weight:800; letter-spacing:.2px; background:linear-gradient(135deg, rgba(124,92,255,.12), rgba(33,212,253,.12)); color:var(--ink); border:1px solid rgba(255,255,255,.12); box-shadow:var(--shadow)}
+    .btn:disabled{opacity:.5; cursor:not-allowed}
+    .btn-ghost{background:transparent}
+    .field{background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); border-radius:12px; padding:10px 12px; width:100%; color:var(--ink); font-weight:600}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size:14px}
+    .dropzone{border:2px dashed rgba(255,255,255,.15); border-radius:16px; padding:24px; text-align:center; transition:.25s ease; min-height:140px; display:grid; place-items:center}
+    .dropzone.drag{background:rgba(124,92,255,.08); border-color:var(--brand)}
+    .list{display:flex; flex-direction:column; gap:10px; max-height:380px; overflow:auto; padding-right:6px}
+    .file{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px; border-radius:12px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.08)}
+    .progress{height:10px; background:rgba(255,255,255,.08); border-radius:999px; overflow:hidden}
+    .bar{height:100%; background:linear-gradient(90deg, var(--brand), var(--brand2)); width:0%}
+    .pill{padding:8px 10px; border:1px dashed rgba(255,255,255,.12); border-radius:12px}
+    .tiny{font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo">
+        <div class="logo-badge" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 7a4 4 0 0 1 4-4h7.5a3.5 3.5 0 1 1 0 7H8a3 3 0 0 0 0 6h6.5a4.5 4.5 0 1 1 0 9H7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <div class="title">PeerBeam</div>
+          <div class="tag tiny">Direct P2P over WebRTC — manual pairing, no trackers, no server. Session stays alive.</div>
+        </div>
+      </div>
+      <div class="pill tiny">Once paired, keep both tabs open and send repeatedly — no new codes.</div>
+    </header>
+
+    <section class="hero card">
+      <h1>Share files & folders with nothing in the middle.</h1>
+      <p class="muted">Create a one‑time pairing code, paste it on the other device, paste their answer back. Connection stays alive — drop files anytime to send again.</p>
+
+      <div class="tabs" role="tablist" aria-label="Modes">
+        <button class="tab" id="tab-send" role="tab" aria-selected="true" aria-controls="panel-send">Send</button>
+        <button class="tab" id="tab-recv" role="tab" aria-selected="false" aria-controls="panel-recv">Receive</button>
+      </div>
+
+      <div class="grid">
+        <!-- SEND PANEL -->
+        <div id="panel-send" class="pane card" role="tabpanel" aria-labelledby="tab-send">
+          <h2>Send files / folders</h2>
+          <div id="drop" class="dropzone">
+            <div>
+              <div style="font-weight:800; font-size:18px">Drag & drop here</div>
+              <div class="tiny muted">or</div>
+              <div class="row" style="justify-content:center; margin-top:10px">
+                <label class="btn" for="pick">Choose files</label>
+                <label class="btn" for="pick-dir">Choose folder</label>
+                <input id="pick" type="file" hidden multiple>
+                <input id="pick-dir" type="file" hidden webkitdirectory directory multiple>
+              </div>
+              <div class="tiny muted" style="margin-top:8px">You can pick now or after pairing — either way works.</div>
+            </div>
+          </div>
+
+          <div style="margin-top:16px">
+            <div class="muted tiny" style="margin-bottom:6px">Step 1 — Create pairing code (offer)</div>
+            <div class="row">
+              <button id="make-offer" class="btn">Create code</button>
+              <button id="copy-offer" class="btn btn-ghost" disabled>Copy</button>
+            </div>
+            <textarea id="offer" class="field mono" rows="6" placeholder="Offer code will appear here" readonly></textarea>
+          </div>
+
+          <div style="margin-top:16px">
+            <div class="muted tiny" style="margin-bottom:6px">Step 2 — Paste the receiver's answer code</div>
+            <textarea id="answer-in" class="field mono" rows="6" placeholder="Paste answer code from receiver here"></textarea>
+            <div class="row" style="margin-top:8px">
+              <button id="accept-answer" class="btn" disabled>Connect</button>
+              <span class="pill tiny">State: <span id="state-send">idle</span></span>
+            </div>
+          </div>
+
+          <div id="seed-ui" style="display:none; margin-top:16px">
+            <div class="muted tiny" style="margin-bottom:6px">Transfer (connection persists — drop more files anytime)</div>
+            <div class="progress"><div id="seed-bar" class="bar"></div></div>
+            <div class="row tiny muted" style="margin-top:8px; gap:8px">
+              <span class="pill">In queue: <span id="seed-files">0</span></span>
+              <span class="pill">Sent: <span id="seed-sent">0 B</span></span>
+              <span class="pill">Rate: <span id="seed-rate">0 KB/s</span></span>
+            </div>
+            <div class="list" id="seed-list" style="margin-top:10px"></div>
+          </div>
+        </div>
+
+        <!-- RECEIVE PANEL -->
+        <div id="panel-recv" class="pane card" role="tabpanel" aria-labelledby="tab-recv" hidden>
+          <h2>Receive / download</h2>
+          <div>
+            <div class="muted tiny" style="margin-bottom:6px">Step 1 — Paste sender's offer code</div>
+            <textarea id="offer-in" class="field mono" rows="6" placeholder="Paste the offer code from the sender here"></textarea>
+            <div class="row" style="margin-top:8px">
+              <button id="make-answer" class="btn">Generate answer</button>
+              <button id="copy-answer" class="btn btn-ghost" disabled>Copy</button>
+              <span class="pill tiny">State: <span id="state-recv">idle</span></span>
+            </div>
+            <textarea id="answer" class="field mono" rows="6" placeholder="Your answer code will appear here" readonly></textarea>
+          </div>
+
+          <div style="margin-top:16px">
+            <div class="muted tiny" style="margin-bottom:6px">Transfer</div>
+            <div class="progress"><div id="dl-bar" class="bar"></div></div>
+            <div class="row tiny muted" style="margin-top:8px; gap:8px">
+              <span class="pill">Files: <span id="dl-files">0</span></span>
+              <span class="pill">Received: <span id="dl-recv">0 B</span></span>
+              <span class="pill">Rate: <span id="dl-rate">0 KB/s</span></span>
+            </div>
+            <div class="list" id="list" style="margin-top:10px"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tiny muted" style="margin-top:12px">Heads-up: With only STUN (no TURN), some strict NATs may fail to connect. Try switching one device to mobile hotspot if it stalls at "connecting".</div>
+    </section>
+
+    <footer style="margin:26px 0 10px; text-align:center" class="muted tiny">This is true end-to-end. There’s no server. The codes are just your WebRTC session descriptions, base64‑packed for convenience. Session persists until a tab reloads or closes.</footer>
+  </div>
+
+  <script>
+    // ——— helpers
+    const $ = s => document.querySelector(s);
+    const fmtBytes = (b)=>{ if(b===0) return '0 B'; const u=['B','KB','MB','GB','TB']; const i=Math.floor(Math.log(b)/Math.log(1024)); return (b/Math.pow(1024,i)).toFixed(i?1:0)+' '+u[i]; };
+    const fmtSpeed = (bps)=> `${fmtBytes(bps)}/s`;
+
+    // tabs
+    const tabSend=$('#tab-send'), tabRecv=$('#tab-recv');
+    const panelSend=$('#panel-send'), panelRecv=$('#panel-recv');
+    function selectTab(which){ const isSend=which==='send'; tabSend.setAttribute('aria-selected',isSend); tabRecv.setAttribute('aria-selected',!isSend); panelSend.hidden=!isSend; panelRecv.hidden=isSend; (isSend?panelSend:panelRecv).scrollIntoView({behavior:'smooth'}); }
+    tabSend.addEventListener('click',()=>selectTab('send')); tabRecv.addEventListener('click',()=>selectTab('recv'));
+
+    // ——— ICE utils (single-paste codes)
+    function waitIceComplete(pc){
+      return new Promise(resolve=>{
+        if (pc.iceGatheringState === 'complete') return resolve();
+        function check(){ if (pc.iceGatheringState === 'complete'){ pc.removeEventListener('icegatheringstatechange', check); resolve(); } }
+        pc.addEventListener('icegatheringstatechange', check);
+        setTimeout(()=>resolve(), 8000);
+      });
+    }
+
+    // ——— global state (persistent session)
+    let send = { pc:null, dc:null, queue:[], sending:false, bytes:0, totalBytes:0, startTs:0 };
+    let recv = { pc:null, dc:null, bytes:0, startTs:0 };
+
+    // ——— file picking (sender)
+    const drop=$('#drop'), pick=$('#pick'), pickDir=$('#pick-dir');
+    const makeOfferBtn=$('#make-offer'), copyOfferBtn=$('#copy-offer');
+    const offerOut=$('#offer');
+    const answerIn=$('#answer-in'), acceptAnswerBtn=$('#accept-answer');
+    const seedUI=$('#seed-ui'), seedBar=$('#seed-bar');
+    const seedFiles=$('#seed-files'), seedSent=$('#seed-sent'), seedRate=$('#seed-rate'), seedList=$('#seed-list');
+    const stateSend=$('#state-send');
+
+    ;['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault(); drop.classList.add('drag');}));
+    ;['dragleave','drop'].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault(); drop.classList.remove('drag');}));
+    drop.addEventListener('drop', handleDrop);
+    function handleDrop(e){
+      const items = e.dataTransfer?.items;
+      if (items && items.length && items[0].webkitGetAsEntry){
+        const promises = [];
+        for (const item of items){ const entry=item.webkitGetAsEntry(); if(entry) promises.push(readEntry(entry)); }
+        Promise.all(promises).then(arr=>queueFiles(arr.flat()));
+      } else {
+        queueFiles([...e.dataTransfer.files]);
+      }
+    }
+    function readEntry(entry){
+      return new Promise(resolve=>{
+        if (entry.isFile){ entry.file(f=>{ f.relativePath = entry.fullPath?.replace(/^\//,'') || f.name; resolve([f]); }); }
+        else if (entry.isDirectory){ const r=entry.createReader(); const all=[]; (function read(){ r.readEntries(entries=>{ if(!entries.length) return resolve(all); Promise.all(entries.map(readEntry)).then(res=>{ all.push(...res.flat()); read(); }); }); })(); }
+        else resolve([]);
+      });
+    }
+
+    pick.addEventListener('change', e=> queueFiles([...e.target.files]));
+    pickDir.addEventListener('change', e=> queueFiles([...e.target.files]));
+
+    function queueFiles(files){
+      if(!files || !files.length) return;
+      const additions = files.map(f=>({ file:f, name:f.name, size:f.size, path:f.webkitRelativePath||f.relativePath||f.name }));
+      send.queue.push(...additions);
+      seedFiles.textContent = String(send.queue.length);
+      // Show list items pending
+      additions.forEach((m, idx)=>{
+        const row=document.createElement('div'); row.className='file'; row.id=`s-row-${Date.now()}-${idx}`;
+        row.innerHTML=`<div class="row" style="gap:8px"><strong>${m.path}</strong><span class="tiny muted">${fmtBytes(m.size)}</span></div><div class="tiny muted">queued</div>`;
+        seedList.appendChild(row);
+      });
+      if (send.dc && send.dc.readyState==='open' && !send.sending){
+        startSendingLoop();
+      } else {
+        // will auto-start once DC opens
+      }
+    }
+
+    // ——— Sender: create offer code (can be done before files are chosen)
+    makeOfferBtn.addEventListener('click', async ()=>{
+      offerOut.value=''; copyOfferBtn.disabled=true; acceptAnswerBtn.disabled=true;
+      stateSend.textContent='preparing…';
+      const pc = new RTCPeerConnection({
+        iceServers:[
+          { urls:'stun:stun.l.google.com:19302' },
+          { urls:'stun:global.stun.twilio.com:3478' }
+        ]
+      });
+      send.pc = pc;
+      const dc = pc.createDataChannel('peerbeam');
+      send.dc = dc;
+      wireDataChannelSender(dc);
+      pc.onconnectionstatechange = ()=> stateSend.textContent = pc.connectionState;
+      const offer = await pc.createOffer({offerToReceiveAudio:false, offerToReceiveVideo:false});
+      await pc.setLocalDescription(offer);
+      await waitIceComplete(pc);
+      const code = btoa(unescape(encodeURIComponent(JSON.stringify(pc.localDescription))));
+      offerOut.value = code;
+      copyOfferBtn.disabled=false;
+      acceptAnswerBtn.disabled=false;
+      stateSend.textContent='offer-ready';
+    });
+    copyOfferBtn.addEventListener('click', async ()=>{ await navigator.clipboard.writeText(offerOut.value); copyOfferBtn.textContent='Copied'; setTimeout(()=>copyOfferBtn.textContent='Copy',1200); });
+
+    // ——— Sender: accept answer
+    acceptAnswerBtn.addEventListener('click', async ()=>{
+      const code = answerIn.value.trim(); if(!code || !send.pc) return;
+      stateSend.textContent='connecting…';
+      try{ const sdp = JSON.parse(decodeURIComponent(escape(atob(code)))); await send.pc.setRemoteDescription(sdp); }
+      catch(e){ stateSend.textContent='bad-answer'; console.error(e); return; }
+    });
+
+    function wireDataChannelSender(dc){
+      dc.binaryType='arraybuffer';
+      dc.bufferedAmountLowThreshold = 1<<20; // 1 MB
+      dc.onopen = ()=>{
+        seedUI.style.display='block';
+        send.bytes=0; send.totalBytes=0; send.startTs=performance.now();
+        // If there are pending files, start sending
+        if (send.queue.length && !send.sending) startSendingLoop();
+      };
+      dc.onclose = ()=>{ /* session ended */ };
+
+      // speed/progress ticker
+      let lastBytes=0, lastTs=performance.now();
+      const tick=()=>{
+        const now=performance.now(); const dt=(now-lastTs)/1000; if(dt>=1){
+          const sent = send.bytes; const dBytes = sent-lastBytes; lastBytes=sent; lastTs=now;
+          seedRate.textContent = fmtSpeed(dBytes/dt);
+          const totalQueued = send.totalBytes || send.queue.reduce((a,f)=>a+f.size,0);
+          const prog = totalQueued? (sent/totalQueued)*100: (send.sending? (sent?100:0):0);
+          seedBar.style.width = Math.min(100, prog).toFixed(1)+'%';
+          seedSent.textContent = fmtBytes(sent);
+        }
+        requestAnimationFrame(tick);
+      }; tick();
+    }
+
+    async function startSendingLoop(){
+      if (!send.dc || send.dc.readyState!=='open') return;
+      send.sending = true;
+      // snapshot total for this batch
+      send.totalBytes = send.queue.reduce((a,f)=>a+f.size,0);
+
+      // Build manifest for current queue
+      const manifest = send.queue.map((f,i)=>({i, name:f.name, size:f.size, path:f.path}));
+      send.dc.send(JSON.stringify({t:'manifest', files:manifest}));
+
+      // render list entries to show 0%
+      seedList.querySelectorAll('.file').forEach((row,idx)=>{
+        // append progress cell if not present
+        if (!row.querySelector('.tiny.muted:last-child')){
+          const prog = document.createElement('div'); prog.className='tiny muted'; prog.id=`s-${idx}`; prog.textContent='0%'; row.appendChild(prog);
+        }
+      });
+
+      // send files sequentially
+      for (let i=0;i<send.queue.length;i++){
+        const meta = manifest[i];
+        const item = send.queue[i];
+        send.dc.send(JSON.stringify({t:'fileStart', i:meta.i, name:meta.name, size:meta.size, path:meta.path}));
+        await sendFileChunks(send.dc, item.file, (sent,total)=>{
+          const p = total? Math.min(100, (sent/total)*100):0;
+          const stat = document.getElementById(`s-${meta.i}`); if(stat) stat.textContent = p.toFixed(0)+'%';
+        });
+        send.dc.send(JSON.stringify({t:'fileEnd', i:meta.i}));
+      }
+      send.dc.send(JSON.stringify({t:'allDone'}));
+      // clear queue after sending
+      send.queue = [];
+      seedFiles.textContent = '0';
+      send.sending = false;
+      // leave connection open; user can drop more files and we'll start again
+    }
+
+    async function sendFileChunks(dc, file, onProg){
+      const CHUNK = 64 * 1024; // 64KB
+      const reader = file.stream().getReader();
+      let sent = 0;
+      while(true){
+        const {done, value} = await reader.read();
+        if(done) break;
+        let chunk = value.buffer;
+        if (dc.bufferedAmount > dc.bufferedAmountLowThreshold){
+          await new Promise(res=>{ const h=()=>{ if(dc.bufferedAmount <= dc.bufferedAmountLowThreshold){ dc.removeEventListener('bufferedamountlow', h); res(); } }; dc.addEventListener('bufferedamountlow', h); });
+        }
+        dc.send(chunk);
+        sent += value.byteLength; send.bytes += value.byteLength;
+        onProg(sent, file.size);
+      }
+    }
+
+    // ——— Receiver side
+    const offerIn=$('#offer-in'), makeAnswerBtn=$('#make-answer'), copyAnswerBtn=$('#copy-answer');
+    const answerOut=$('#answer');
+    const list=$('#list'), dlBar=$('#dl-bar');
+    const dlFiles=$('#dl-files'), dlRecv=$('#dl-recv'), dlRate=$('#dl-rate'), stateRecv=$('#state-recv');
+
+    makeAnswerBtn.addEventListener('click', async ()=>{
+      const code = offerIn.value.trim(); if(!code) return;
+      stateRecv.textContent='parsing…';
+      const pc = new RTCPeerConnection({
+        iceServers:[
+          { urls:'stun:stun.l.google.com:19302' },
+          { urls:'stun:global.stun.twilio.com:3478' }
+        ]
+      });
+      recv.pc = pc;
+      pc.onconnectionstatechange = ()=> stateRecv.textContent = pc.connectionState;
+      pc.ondatachannel = (ev)=>{ const dc = ev.channel; recv.dc = dc; wireDataChannelReceiver(dc); };
+      let remote;
+      try{ remote = JSON.parse(decodeURIComponent(escape(atob(code)))); }
+      catch(e){ stateRecv.textContent='bad-offer'; console.error(e); return; }
+      await pc.setRemoteDescription(remote);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      await waitIceComplete(pc);
+      const packed = btoa(unescape(encodeURIComponent(JSON.stringify(pc.localDescription))));
+      answerOut.value = packed; copyAnswerBtn.disabled=false; stateRecv.textContent='answer-ready';
+    });
+
+    copyAnswerBtn.addEventListener('click', async ()=>{ await navigator.clipboard.writeText(answerOut.value); copyAnswerBtn.textContent='Copied'; setTimeout(()=>copyAnswerBtn.textContent='Copy',1200); });
+
+    function wireDataChannelReceiver(dc){
+      dc.binaryType='arraybuffer';
+      const files=[]; // {i,name,size,path,parts:[],received}
+      recv.bytes=0; recv.startTs=performance.now();
+      // do not clear list on each new batch; keep history
+
+      dc.onmessage = (ev)=>{
+        if (typeof ev.data === 'string'){
+          try{
+            const msg = JSON.parse(ev.data);
+            if (msg.t==='manifest'){
+              msg.files.forEach(m=>{
+                const row=document.createElement('div'); row.className='file'; row.id=`r-${Date.now()}-${m.i}`;
+                row.innerHTML=`<div class="row" style="gap:8px"><strong>${m.path}</strong><span class=\"tiny muted\">${fmtBytes(m.size)}</span></div><div class="tiny muted" id="p-${m.i}">0%</div>`;
+                list.appendChild(row);
+                files[m.i] = {i:m.i,name:m.name,size:m.size,path:m.path,parts:[],received:0};
+              });
+              dlFiles.textContent = String((+dlFiles.textContent||0) + msg.files.length);
+            } else if (msg.t==='fileStart'){
+              files[msg.i] = files[msg.i] || {i:msg.i,name:msg.name,size:msg.size,path:msg.path,parts:[],received:0};
+            } else if (msg.t==='fileEnd'){
+              const f = files[msg.i];
+              const blob = new Blob(f.parts, {type:'application/octet-stream'});
+              const url = URL.createObjectURL(blob);
+              const row = document.getElementById(`p-${msg.i}`)?.parentElement;
+              const dl = document.createElement('a'); dl.className='btn'; dl.textContent='Save'; dl.href=url; dl.download=f.path||f.name; if(row) row.appendChild(dl);
+            }
+          }catch{ /* ignore non-JSON text */ }
+        } else {
+          // binary chunk -> map to first incomplete file
+          const f = files.find(x=>x && x.received < x.size);
+          if(!f) return;
+          const buf = ev.data; f.parts.push(buf); f.received += buf.byteLength; recv.bytes += buf.byteLength;
+          const p = f.size? Math.min(100, (f.received/f.size)*100):0;
+          const el = document.getElementById(`p-${f.i}`); if(el) el.textContent=p.toFixed(0)+'%';
+        }
+      };
+
+      // speed ticker
+      let lastBytes=0, lastTs=performance.now();
+      const tick=()=>{
+        const now=performance.now(); const dt=(now-lastTs)/1000; if(dt>=1){
+          const got = recv.bytes; const dBytes = got-lastBytes; lastBytes=got; lastTs=now;
+          dlRate.textContent = fmtSpeed(dBytes/dt);
+          dlRecv.textContent = fmtBytes(got);
         }
         requestAnimationFrame(tick);
       }; tick();
