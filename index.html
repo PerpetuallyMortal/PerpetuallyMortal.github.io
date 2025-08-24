@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PeerBeam — Share Files & Folders (No Login)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <meta name="description" content="Peer‑to‑peer file & folder sharing right from your browser. No login, no server storage. Just a magnet link or QR." />
+  <!-- WebTorrent + QR -->
+  <script src="https://cdn.jsdelivr.net/npm/webtorrent@2.4.2/dist/webtorrent.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <style>
+    :root{
+      --bg: #0b0f14;
+      --panel: #101720;
+      --ink: #eaf2ff;
+      --muted: #98a6bd;
+      --brand: #7c5cff;
+      --brand-2:#21d4fd;
+      --ok: #36d399;
+      --warn: #fbbf24;
+      --err:#f87171;
+      --radius: 18px;
+      --shadow: 0 10px 30px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.3);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Helvetica Neue",Arial,sans-serif;
+      color:var(--ink); background: radial-gradient(1200px 700px at 10% -10%, rgba(124, 92, 255, .18), transparent 60%),
+                        radial-gradient(800px 600px at 110% 10%, rgba(33, 212, 253, .15), transparent 60%), var(--bg);
+    }
+    a{color:inherit}
+    .wrap{max-width:1100px; margin:0 auto; padding:28px;}
+    header{display:flex; align-items:center; justify-content:space-between; gap:16px;}
+    .logo{display:flex; align-items:center; gap:12px; font-weight:800; letter-spacing:.2px}
+    .logo-badge{width:42px;height:42px;border-radius:12px; background:linear-gradient(135deg,var(--brand),var(--brand-2)); display:grid; place-items:center; box-shadow:var(--shadow)}
+    .logo svg{filter:drop-shadow(0 4px 12px rgba(0,0,0,.35))}
+    .tag{color:var(--muted); font-weight:600}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.00)); border:1px solid rgba(255,255,255,.08); border-radius:var(--radius); box-shadow:var(--shadow)}
+    .hero{margin-top:18px; padding:26px}
+    .hero h1{font-size:clamp(28px,4vw,40px); margin:10px 0 8px 0; line-height:1.1}
+    .hero p{color:var(--muted); margin:0}
+    .tabs{margin-top:22px; display:flex; gap:10px; flex-wrap:wrap}
+    .tab{cursor:pointer; padding:12px 16px; border-radius:14px; font-weight:700; border:1px solid rgba(255,255,255,.1); background:rgba(124,92,255,.08); backdrop-filter: blur(6px)}
+    .tab[aria-selected="false"]{background:transparent; color:var(--muted)}
+
+    .grid{display:grid; grid-template-columns: 1fr; gap:18px; margin-top:18px}
+    @media(min-width:980px){
+      .grid{grid-template-columns: 1.2fr .8fr}
+    }
+
+    .pane{padding:18px}
+    .pane h2{margin:0 0 10px 0}
+    .muted{color:var(--muted)}
+    .dropzone{border:2px dashed rgba(255,255,255,.15); border-radius:16px; padding:24px; text-align:center; transition:.25s ease; min-height:140px; display:grid; place-items:center}
+    .dropzone.drag{background:rgba(124,92,255,.08); border-color:var(--brand)}
+    .row{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+    .btn{appearance:none; border:0; cursor:pointer; padding:12px 16px; border-radius:14px; font-weight:800; letter-spacing:.2px; background:linear-gradient(135deg, rgba(124,92,255,.12), rgba(33,212,253,.12)); color:var(--ink); border:1px solid rgba(255,255,255,.12); box-shadow:var(--shadow)}
+    .btn:disabled{opacity:.5; cursor:not-allowed}
+    .btn-ghost{background:transparent}
+    .field{background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); border-radius:12px; padding:10px 12px; width:100%; color:var(--ink); font-weight:600}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:14px}
+    .chip{display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08); font-weight:700}
+    .progress{height:10px; background:rgba(255,255,255,.08); border-radius:999px; overflow:hidden}
+    .bar{height:100%; background:linear-gradient(90deg, var(--brand), var(--brand-2)); width:0%}
+    .list{display:flex; flex-direction:column; gap:10px; max-height:360px; overflow:auto; padding-right:6px}
+    .file{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px; border-radius:12px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.08)}
+    .kbd{padding:2px 6px; border:1px solid rgba(255,255,255,.2); border-bottom-width:3px; border-radius:6px; font-weight:800}
+    footer{margin:26px 0 10px; color:var(--muted); text-align:center}
+    .tiny{font-size:12px}
+    .pill{padding:8px 10px; border:1px dashed rgba(255,255,255,.12); border-radius:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo">
+        <div class="logo-badge" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 7a4 4 0 0 1 4-4h7.5a3.5 3.5 0 1 1 0 7H8a3 3 0 0 0 0 6h6.5a4.5 4.5 0 1 1 0 9H7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <div style="font-size:18px">PeerBeam</div>
+          <div class="tag tiny">P2P file & folder share — no login, no server storage</div>
+        </div>
+      </div>
+      <div class="chip">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 20v-6m0 0l3 3m-3-3l-3 3M3 6h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        WebRTC + WebTorrent
+      </div>
+    </header>
+
+    <section class="hero card">
+      <h1>Share anything, straight from your browser.</h1>
+      <p>Drop files or an entire folder. You get a magnet link + QR. Keep this tab open to seed; your other device pastes the link to fetch. No accounts. No storage bills. Just P2P.</p>
+      <div class="tabs" role="tablist" aria-label="Modes">
+        <button class="tab" id="tab-send" role="tab" aria-selected="true" aria-controls="panel-send">Send</button>
+        <button class="tab" id="tab-recv" role="tab" aria-selected="false" aria-controls="panel-recv">Receive</button>
+      </div>
+
+      <div class="grid">
+        <!-- SEND PANE -->
+        <div id="panel-send" class="pane card" role="tabpanel" aria-labelledby="tab-send">
+          <h2>Send files / folders</h2>
+          <div id="drop" class="dropzone">
+            <div>
+              <div style="font-weight:800; font-size:18px">Drag & drop here</div>
+              <div class="muted tiny">or</div>
+              <div class="row" style="justify-content:center; margin-top:10px">
+                <label class="btn" for="pick">Choose files</label>
+                <label class="btn" for="pick-dir">Choose folder</label>
+                <input id="pick" type="file" hidden multiple>
+                <input id="pick-dir" type="file" hidden webkitdirectory directory multiple>
+              </div>
+            </div>
+          </div>
+
+          <div id="seed-ui" style="display:none; margin-top:16px">
+            <div class="row" style="justify-content:space-between; align-items:flex-start">
+              <div style="flex:1">
+                <div class="muted tiny" style="margin-bottom:6px">Magnet link</div>
+                <div class="row" style="gap:8px">
+                  <input id="magnet" class="field mono" readonly>
+                  <button class="btn" id="copy">Copy</button>
+                  <button class="btn btn-ghost" id="share">Share</button>
+                </div>
+                <div class="row tiny muted" style="margin-top:8px; gap:8px">
+                  <span class="pill">Peers: <span id="seed-peers">0</span></span>
+                  <span class="pill">Up: <span id="seed-up">0 KB/s</span></span>
+                </div>
+              </div>
+              <div style="width:180px">
+                <div id="qrcode" class="card" style="padding:8px; display:grid; place-items:center"></div>
+              </div>
+            </div>
+
+            <div style="margin-top:14px">
+              <div class="muted tiny" style="margin-bottom:6px">Seeding progress</div>
+              <div class="progress"><div id="seed-bar" class="bar"></div></div>
+            </div>
+
+            <div style="margin-top:14px">
+              <div class="muted tiny" style="margin-bottom:6px">Files</div>
+              <div id="seed-list" class="list"></div>
+            </div>
+
+            <div class="tiny muted" style="margin-top:10px">Keep this tab open while others download. Close it and the swarm loses its heartbeat.</div>
+          </div>
+        </div>
+
+        <!-- RECEIVE PANE -->
+        <div id="panel-recv" class="pane card" role="tabpanel" aria-labelledby="tab-recv" hidden>
+          <h2>Receive / download</h2>
+          <div class="row">
+            <input id="magnet-in" class="field mono" placeholder="Paste magnet link or info hash (starts with magnet:?xt=...)" />
+            <button id="start" class="btn">Start</button>
+          </div>
+
+          <div style="margin-top:14px">
+            <div class="row tiny muted" style="gap:8px">
+              <span class="pill">Peers: <span id="peers">0</span></span>
+              <span class="pill">Down: <span id="down">0 KB/s</span></span>
+              <span class="pill">Up: <span id="up">0 KB/s</span></span>
+            </div>
+            <div class="progress" style="margin-top:8px"><div id="dl-bar" class="bar"></div></div>
+          </div>
+
+          <div style="margin-top:14px">
+            <div class="muted tiny" style="margin-bottom:6px">Files</div>
+            <div id="list" class="list"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="tiny">Reality check: this is true P2P. Your files are <em>not</em> uploaded to any cloud. The sender must stay online. Office/college firewalls may block WebRTC/trackers.</div>
+    </footer>
+  </div>
+
+  <script>
+    // ——— Utilities
+    const fmtBytes = (b)=>{
+      if (b===0) return '0 B';
+      const u=['B','KB','MB','GB','TB'];
+      const i=Math.floor(Math.log(b)/Math.log(1024));
+      return (b/Math.pow(1024,i)).toFixed(i?1:0)+' '+u[i];
+    };
+    const fmtSpeed = (bps)=> `${fmtBytes(bps)}/s`;
+
+    // ——— WebTorrent client
+    const client = new WebTorrent({
+      tracker: {
+        rtcConfig: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
+          ]
+        }
+      }
+    });
+
+    // ——— Tabs
+    const $ = sel => document.querySelector(sel);
+    const tabSend = $('#tab-send');
+    const tabRecv = $('#tab-recv');
+    const panelSend = $('#panel-send');
+    const panelRecv = $('#panel-recv');
+
+    function selectTab(which){
+      const isSend = which==='send';
+      tabSend.setAttribute('aria-selected', isSend);
+      tabRecv.setAttribute('aria-selected', !isSend);
+      panelSend.hidden = !isSend;
+      panelRecv.hidden = isSend;
+      (isSend?panelSend:panelRecv).scrollIntoView({behavior:'smooth', block:'start'});
+    }
+    tabSend.addEventListener('click', ()=>selectTab('send'));
+    tabRecv.addEventListener('click', ()=>selectTab('recv'));
+
+    // ——— SEND logic
+    const drop = $('#drop');
+    const pick = $('#pick');
+    const pickDir = $('#pick-dir');
+    const seedUI = $('#seed-ui');
+    const magnetOut = $('#magnet');
+    const copyBtn = $('#copy');
+    const shareBtn = $('#share');
+    const seedPeers = $('#seed-peers');
+    const seedUp = $('#seed-up');
+    const seedBar = $('#seed-bar');
+    const seedList = $('#seed-list');
+    const qrBox = $('#qrcode');
+    let seedTorrent = null;
+
+    const trackers = [
+      'wss://tracker.openwebtorrent.com',
+      'wss://tracker.btorrent.xyz',
+      'wss://tracker.webtorrent.dev'
+    ];
+
+    function handleFiles(files){
+      if (!files || !files.length) return;
+      seedList.innerHTML = '';
+      seedUI.style.display = 'block';
+
+      const opts = { announce: trackers };
+      client.seed(files, opts, (torrent)=>{
+        seedTorrent = torrent;
+        const magnet = torrent.magnetURI;
+        magnetOut.value = magnet;
+        qrBox.innerHTML = '';
+        new QRCode(qrBox, { text: magnet, width: 160, height: 160, correctLevel: QRCode.CorrectLevel.M });
+
+        // List files
+        torrent.files.forEach(f=>{
+          const li = document.createElement('div');
+          li.className = 'file';
+          li.innerHTML = `<div class="row" style="gap:8px"><strong>${f.name}</strong><span class="muted tiny">${fmtBytes(f.length)}</span></div>` +
+                          `<a class="btn btn-ghost" download>Preview</a>`;
+          const a = li.querySelector('a');
+          a.addEventListener('click', async ()=>{
+            const url = await f.getBlobURL();
+            a.href = url;
+            a.download = f.name;
+          });
+          seedList.appendChild(li);
+        });
+
+        const update = ()=>{
+          seedPeers.textContent = torrent.numPeers;
+          seedUp.textContent = fmtSpeed(torrent.uploadSpeed);
+          const ratio = torrent.progress; // 0..1
+          seedBar.style.width = (ratio*100).toFixed(1)+'%';
+          requestAnimationFrame(update);
+        };
+        update();
+      });
+    }
+
+    // Drag & drop
+    ;['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault(); e.stopPropagation(); drop.classList.add('drag')}));
+    ;['dragleave','drop'].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault(); e.stopPropagation(); drop.classList.remove('drag')}));
+    drop.addEventListener('drop', e=>{
+      const items = e.dataTransfer.items;
+      if (items && items.length && items[0].webkitGetAsEntry){
+        // Handle directories via DataTransferItem API
+        const promises = [];
+        for (const item of items){
+          const entry = item.webkitGetAsEntry();
+          if (!entry) continue;
+          promises.push(readEntry(entry));
+        }
+        Promise.all(promises).then(fileArrays=>{
+          const flat = fileArrays.flat();
+          handleFiles(flat);
+        });
+      } else {
+        handleFiles(e.dataTransfer.files);
+      }
+    });
+
+    // Recursive directory read for drag&drop
+    function readEntry(entry){
+      return new Promise(resolve=>{
+        if (entry.isFile){
+          entry.file(f=>resolve([f]));
+        } else if (entry.isDirectory){
+          const dirReader = entry.createReader();
+          const all = [];
+          const readBatch = ()=>{
+            dirReader.readEntries(entries=>{
+              if (!entries.length){ resolve(all); return; }
+              Promise.all(entries.map(readEntry)).then(res=>{ all.push(...res.flat()); readBatch(); });
+            });
+          };
+          readBatch();
+        } else resolve([]);
+      });
+    }
+
+    // File pickers
+    pick.addEventListener('change', e=> handleFiles(e.target.files));
+    pickDir.addEventListener('change', e=> handleFiles(e.target.files));
+
+    copyBtn.addEventListener('click', async ()=>{
+      if (!magnetOut.value) return;
+      await navigator.clipboard.writeText(magnetOut.value);
+      copyBtn.textContent = 'Copied';
+      setTimeout(()=>copyBtn.textContent='Copy', 1200);
+    });
+
+    shareBtn.addEventListener('click', async ()=>{
+      const text = 'PeerBeam magnet link';
+      if (navigator.share){
+        try{ await navigator.share({title:'PeerBeam', text, url: magnetOut.value}); }catch(e){}
+      } else { await navigator.clipboard.writeText(magnetOut.value); }
+    });
+
+    // ——— RECEIVE logic
+    const magnetIn = $('#magnet-in');
+    const startBtn = $('#start');
+    const peers = $('#peers');
+    const down = $('#down');
+    const up = $('#up');
+    const dlBar = $('#dl-bar');
+    const list = $('#list');
+
+    startBtn.addEventListener('click', startDownload);
+    magnetIn.addEventListener('keydown', e=>{ if(e.key==='Enter') startDownload(); });
+
+    function startDownload(){
+      let input = magnetIn.value.trim();
+      if (!input) return;
+      if (/^[a-f0-9]{40}$/i.test(input)){
+        input = `magnet:?xt=urn:btih:${input}`;
+      }
+      list.innerHTML = '';
+      client.add(input, { announce: trackers }, torrent=>{
+        function renderFile(f){
+          const row = document.createElement('div'); row.className='file';
+          const left = document.createElement('div'); left.className='row'; left.style.gap='8px';
+          left.innerHTML = `<strong>${f.name}</strong> <span class="muted tiny">${fmtBytes(f.length)}</span>`;
+          const right = document.createElement('div');
+          const btn = document.createElement('a'); btn.className='btn'; btn.textContent='Download'; btn.target='_blank';
+          btn.addEventListener('click', async ()=>{ btn.textContent='Preparing…'; const url = await f.getBlobURL(); btn.href=url; btn.download=f.name; btn.textContent='Save file'; });
+          right.appendChild(btn);
+          row.append(left,right);
+          list.appendChild(row);
+        }
+        torrent.files.forEach(renderFile);
+
+        const tick = ()=>{
+          peers.textContent = torrent.numPeers;
+          down.textContent = fmtSpeed(torrent.downloadSpeed);
+          up.textContent = fmtSpeed(torrent.uploadSpeed);
+          dlBar.style.width = (torrent.progress*100).toFixed(1)+'%';
+          requestAnimationFrame(tick);
+        };
+        tick();
+      });
+    }
+
+    // Keyboard hints
+    document.addEventListener('keydown', e=>{
+      if(e.ctrlKey && e.key.toLowerCase()==='1') selectTab('send');
+      if(e.ctrlKey && e.key.toLowerCase()==='2') selectTab('recv');
+    });
+  </script>
+</body>
+</html>
